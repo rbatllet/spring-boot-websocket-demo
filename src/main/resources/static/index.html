@@ -5,44 +5,293 @@
     <meta name="viewport"
           content="width=device-width, user-scalable=no, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0">
     <meta http-equiv="X-UA-Compatible" content="ie=edge">
-    <title>Document</title>
+    <title>Spring Boot WebSocket Chat</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .chat-container {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            border-radius: 5px;
+            overflow: hidden;
+            background-color: white;
+        }
+        .chat-header {
+            background-color: #4285f4;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .connection-form {
+            display: flex;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-bottom: 1px solid #ddd;
+        }
+        .connection-form input[type="text"] {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        .connection-form button {
+            padding: 8px 15px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .connection-form button:disabled {
+            background-color: #a0c3ff;
+            cursor: not-allowed;
+        }
+        .messages {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            height: 300px;
+            background-color: white;
+        }
+        .message {
+            margin-bottom: 10px;
+            padding: 8px 12px;
+            border-radius: 4px;
+            background-color: #e9e9e9;
+            max-width: 70%;
+        }
+        .message .sender {
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        .message .content {
+            word-break: break-word;
+        }
+        .message-form {
+            display: flex;
+            padding: 10px;
+            background-color: #f0f0f0;
+            border-top: 1px solid #ddd;
+        }
+        .message-form input[type="text"] {
+            flex-grow: 1;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            margin-right: 10px;
+        }
+        .message-form button {
+            padding: 8px 15px;
+            background-color: #4285f4;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .message-form button:disabled {
+            background-color: #a0c3ff;
+            cursor: not-allowed;
+        }
+        .status {
+            padding: 10px;
+            text-align: center;
+            font-size: 14px;
+            color: #666;
+        }
+        .status.connected {
+            color: green;
+        }
+        .status.disconnected {
+            color: red;
+        }
+        .status.connecting {
+            color: orange;
+        }
+        .error {
+            background-color: #ffebee;
+            color: #c62828;
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="chat-container">
+        <div class="chat-header">
+            <h1>Spring Boot WebSocket Chat</h1>
+        </div>
+        
+        <div class="connection-form">
+            <input type="text" id="name" placeholder="Enter your name" required>
+            <button id="connectButton" onclick="connect()">Connect</button>
+        </div>
+        
+        <div id="connectionStatus" class="status disconnected">Disconnected</div>
+        <div id="errorMessage" class="error"></div>
+        
+        <div id="messages" class="messages"></div>
+        
+        <div class="message-form">
+            <input type="text" id="message" placeholder="Type a message..." disabled>
+            <button id="sendButton" onclick="sendToGroupChat()" disabled>Send</button>
+        </div>
+    </div>
+
     <script type="application/javascript">
         let ws;
+        const messageInput = document.getElementById("message");
+        const sendButton = document.getElementById("sendButton");
+        const connectButton = document.getElementById("connectButton");
+        const nameInput = document.getElementById("name");
+        const connectionStatus = document.getElementById("connectionStatus");
+        const errorMessage = document.getElementById("errorMessage");
+
+        // Enable pressing Enter to send a message
+        messageInput.addEventListener("keypress", function(event) {
+            if (event.key === "Enter") {
+                event.preventDefault();
+                sendToGroupChat();
+            }
+        });
+
+        function showError(message) {
+            errorMessage.textContent = message;
+            errorMessage.style.display = "block";
+            setTimeout(() => {
+                errorMessage.style.display = "none";
+            }, 5000);
+        }
+
+        function updateConnectionStatus(status) {
+            connectionStatus.className = "status " + status;
+            switch(status) {
+                case "connected":
+                    connectionStatus.textContent = "Connected";
+                    break;
+                case "disconnected":
+                    connectionStatus.textContent = "Disconnected";
+                    break;
+                case "connecting":
+                    connectionStatus.textContent = "Connecting...";
+                    break;
+            }
+        }
 
         function connect() {
-            ws = new WebSocket("ws://localhost:8080/chat");
-            ws.onmessage = function (e) {
-                printMessage(e.data);
+            const name = nameInput.value.trim();
+            if (!name) {
+                showError("Please enter your name");
+                return;
             }
-            document.getElementById("connectButton").disabled = true;
-            document.getElementById("connectButton").value = "Connected";
-            document.getElementById("name").disabled = true;
+
+            updateConnectionStatus("connecting");
+            
+            try {
+                ws = new WebSocket("ws://" + window.location.host + "/chat");
+                
+                ws.onopen = function() {
+                    updateConnectionStatus("connected");
+                    connectButton.disabled = true;
+                    nameInput.disabled = true;
+                    messageInput.disabled = false;
+                    sendButton.disabled = false;
+                    messageInput.focus();
+                };
+                
+                ws.onmessage = function(e) {
+                    printMessage(e.data);
+                };
+                
+                ws.onclose = function() {
+                    updateConnectionStatus("disconnected");
+                    connectButton.disabled = false;
+                    nameInput.disabled = false;
+                    messageInput.disabled = true;
+                    sendButton.disabled = true;
+                };
+                
+                ws.onerror = function(e) {
+                    showError("WebSocket error occurred. Please try again later.");
+                    updateConnectionStatus("disconnected");
+                    console.error("WebSocket error:", e);
+                };
+            } catch (error) {
+                showError("Failed to connect: " + error.message);
+                updateConnectionStatus("disconnected");
+                console.error("Connection error:", error);
+            }
         }
 
         function printMessage(data) {
-            let messages = document.getElementById("messages");
-            let messageData = JSON.parse(data);
-            let newMessage = document.createElement("div");
-            newMessage.innerHTML = messageData.name + " : " + messageData.message;
-            messages.appendChild(newMessage);
+            try {
+                const messages = document.getElementById("messages");
+                const messageData = JSON.parse(data);
+                
+                if (messageData.error) {
+                    showError(messageData.error);
+                    return;
+                }
+                
+                const newMessage = document.createElement("div");
+                newMessage.className = "message";
+                
+                const sender = document.createElement("div");
+                sender.className = "sender";
+                sender.textContent = messageData.name;
+                
+                const content = document.createElement("div");
+                content.className = "content";
+                content.textContent = messageData.message;
+                
+                newMessage.appendChild(sender);
+                newMessage.appendChild(content);
+                messages.appendChild(newMessage);
+                
+                // Auto-scroll to bottom
+                messages.scrollTop = messages.scrollHeight;
+            } catch (error) {
+                console.error("Error parsing message:", error);
+                showError("Error displaying message");
+            }
         }
 
         function sendToGroupChat() {
-            let messageText = document.getElementById("message").value;
-            document.getElementById("message").value="";
-            let name = document.getElementById("name").value;
-            let messageObject = {
+            if (!ws || ws.readyState !== WebSocket.OPEN) {
+                showError("Not connected to chat");
+                return;
+            }
+            
+            const messageText = messageInput.value.trim();
+            if (!messageText) {
+                showError("Please enter a message");
+                return;
+            }
+            
+            const name = nameInput.value;
+            const messageObject = {
                 name: name,
                 message: messageText
+            };
+            
+            try {
+                ws.send(JSON.stringify(messageObject));
+                messageInput.value = "";
+                messageInput.focus();
+            } catch (error) {
+                showError("Failed to send message: " + error.message);
+                console.error("Send error:", error);
             }
-            ws.send(JSON.stringify(messageObject))
         }
     </script>
-</head>
-<body>
-<input type="text" id="name"><input id="connectButton" type="button" value="Connect" onclick="connect()">
-<div id="messages"></div>
-<input type="text" id="message">
-<input type="button" value="send" onclick="sendToGroupChat()">
 </body>
 </html>
