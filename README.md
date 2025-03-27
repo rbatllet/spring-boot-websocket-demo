@@ -199,7 +199,7 @@ The test architecture includes special configurations to allow running all tests
 - **Profile-based Configuration**: The application uses the `test` profile during test execution
 - **TestWebSocketConfig**: A special WebSocket configuration activated only during tests
 - **Conditional Configuration**: The main WebSocket configuration uses `@ConditionalOnWebApplication` and `@Profile("!test")` to avoid conflicts during test execution
-- **Single Test Configuration File**: All test-specific settings are consolidated in `application-test.properties` to avoid duplication and make maintenance easier
+- **Single Test Configuration File**: All test-specific settings are consolidated in `application-test.yml` to avoid duplication and make maintenance easier
 - **Resource Efficiency**: The test configuration reuses main application resources (messages, templates) instead of duplicating them
 
 ## WebSocket Endpoints
@@ -244,7 +244,7 @@ The application also shows an online users counter that is only visible when use
 ### Test Components
 
 - `TestWebSocketConfig.java`: Test-specific WebSocket configuration that avoids servlet container initialization issues
-- `application-test.properties`: Consolidated test environment configuration with all necessary settings
+- `application-test.yml`: Consolidated test environment configuration with all necessary settings
 - `TestMessageSourceConfig.java`: Test-specific localization configuration that reuses the main application message resources
 
 ## Configuration
