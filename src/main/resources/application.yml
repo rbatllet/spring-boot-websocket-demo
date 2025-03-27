@@ -1,0 +1,35 @@
+# Server configuration
+server:
+  port: 8080
+
+# Logging configuration
+logging:
+  level:
+    com.example.springbootwebsocket: DEBUG
+  pattern:
+    console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
+
+# Messages configuration - for internationalization
+spring:
+  messages:
+    basename: classpath:i18n/messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
+    use-code-as-default-message: true
+  web:
+    resources:
+      static-locations: classpath:/static/
+  mvc:
+    view:
+      prefix: /
+      suffix: .html
+  devtools:
+    restart:
+      enabled: true
+    livereload:
+      enabled: true
+
+# WebSocket configuration
+# This should be restricted in production
+# websocket:
+#   allowed-origins: http://localhost:8080

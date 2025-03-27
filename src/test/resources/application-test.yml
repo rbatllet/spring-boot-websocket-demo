@@ -1,0 +1,22 @@
+# Configuración específica para los tests
+spring:
+  autoconfigure:
+    exclude: org.springframework.boot.autoconfigure.websocket.servlet.WebSocketServletAutoConfiguration
+  
+  # Deshabilitar el arranque del servidor web embebido completo para los tests
+  main:
+    web-application-type: servlet
+    allow-bean-definition-overriding: true
+  
+  # Configuración de mensajes
+  messages:
+    basename: messages/messages
+    encoding: UTF-8
+    fallback-to-system-locale: false
+    use-code-as-default-message: true
+
+# Configuraciones de logging para tests
+logging:
+  level:
+    org.springframework.web: INFO
+    com.example.springbootwebsocket: DEBUG
