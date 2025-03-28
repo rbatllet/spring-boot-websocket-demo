@@ -1,6 +1,5 @@
 package com.example.springbootwebsocket;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnWebApplication.Type;
@@ -23,7 +22,6 @@ public class WebSocketConfig implements WebSocketConfigurer {
 
     private final ChatMessageHandler chatMessageHandler;
 
-    @Autowired
     public WebSocketConfig(ChatMessageHandler chatMessageHandler) {
         this.chatMessageHandler = chatMessageHandler;
     }
