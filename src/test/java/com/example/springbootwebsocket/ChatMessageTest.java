@@ -72,7 +72,8 @@ class ChatMessageTest {
         ChatMessage message = ChatMessage.createUserCountMessage(5);
         
         assertEquals("System", message.getName());
-        assertEquals("5", message.getMessage());
+        assertEquals("", message.getMessage()); // Message is now empty
+        assertEquals(5, message.getCount()); // Check the count field instead
         assertEquals(ChatMessage.MessageType.USER_COUNT, message.getType());
     }
 

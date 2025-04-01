@@ -82,18 +82,23 @@ body {
     color: #ff8f00;
     border-left: 3px solid #ff8f00;
 }
+.message .message-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 5px;
+}
 .message .sender {
     font-weight: bold;
-    margin-bottom: 5px;
+    color: #333;
+}
+.message .time {
+    font-size: 0.8em;
+    color: #999;
+    margin-left: 10px;
 }
 .message .content {
     word-break: break-word;
-}
-.message .timestamp {
-    font-size: 0.8em;
-    color: #999;
-    text-align: right;
-    margin-top: 5px;
+    clear: both;
 }
 .message-form {
     display: flex;
@@ -172,4 +177,41 @@ body {
     padding: 3px;
     border: 1px solid #ddd;
     border-radius: 3px;
+}
+
+/* Message history separators */
+.history-separator, .new-messages-separator {
+    text-align: center;
+    margin: 15px 0;
+    position: relative;
+    font-size: 14px;
+    color: #666;
+}
+
+.history-separator::before, .new-messages-separator::before {
+    content: "";
+    position: absolute;
+    top: 50%;
+    left: 0;
+    right: 0;
+    border-top: 1px solid #ddd;
+    z-index: 1;
+}
+
+.history-separator span, .new-messages-separator span {
+    background-color: white;
+    padding: 0 10px;
+    position: relative;
+    z-index: 2;
+}
+
+.history-separator {
+    color: #4285f4;
+    font-weight: bold;
+    margin-top: 5px;
+}
+
+.new-messages-separator {
+    color: #0f9d58;
+    font-weight: bold;
 }

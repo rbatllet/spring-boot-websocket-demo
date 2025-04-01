@@ -3,6 +3,7 @@ package com.example.springbootwebsocket;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Component;
 import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
@@ -10,11 +11,12 @@ import org.springframework.web.socket.WebSocketSession;
 import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.example.springbootwebsocket.service.ChatMessageService;
+import com.example.springbootwebsocket.MessageUtils;
 
 import java.io.IOException;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
-import com.fasterxml.jackson.databind.ObjectMapper;
 
 /**
  * Handles WebSocket communication for the chat application
@@ -26,18 +28,19 @@ public class ChatMessageHandler extends TextWebSocketHandler {
     private final Map<String, WebSocketSession> sessions = new ConcurrentHashMap<>();
     private final Map<String, String> sessionNames = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
-    private final MessageUtils messageUtils;
+    private final ChatMessageService chatMessageService;
 
     @Autowired
-    public ChatMessageHandler(MessageUtils messageUtils) {
-        this.messageUtils = messageUtils;
+    public ChatMessageHandler(MessageUtils messageUtils, ChatMessageService chatMessageService) {
+        this.chatMessageService = chatMessageService;
+        // messageUtils is not used but kept for backward compatibility
     }
 
     /**
      * Handles new WebSocket connections
      */
     @Override
-    public void afterConnectionEstablished(WebSocketSession session) {
+    public void afterConnectionEstablished(@NonNull WebSocketSession session) {
         sessions.put(session.getId(), session);
         logger.info("New WebSocket connection established: {}", session.getId());
         logger.info("Total active connections: {}", sessions.size());
@@ -57,26 +60,35 @@ public class ChatMessageHandler extends TextWebSocketHandler {
      * Handles WebSocket connection closures
      */
     @Override
-    public void afterConnectionClosed(WebSocketSession session, CloseStatus status) {
-        String sessionId = session.getId();
-        String userName = sessionNames.remove(sessionId);
-        sessions.remove(sessionId);
+    public void afterConnectionClosed(@NonNull WebSocketSession session, @NonNull CloseStatus status) {
+        logger.info("WebSocket connection closed: {} with status: {}", session.getId(), status);
         
-        logger.info("WebSocket connection closed: {} with status: {}", sessionId, status);
-        logger.info("Total active connections: {}", sessions.size());
-        
-        // Notify other users that someone left the chat
-        if (userName != null) {
-            try {
-                String leaveMessage = messageUtils.getMessage("chat.message.leave", userName);
-                ChatMessage chatLeaveMessage = ChatMessage.createLeaveMessage(userName, leaveMessage);
-                broadcastMessage(chatLeaveMessage);
+        try {
+            // Remove session from active sessions
+            sessions.remove(session.getId());
+            
+            // Get username associated with this session
+            String username = sessionNames.get(session.getId());
+            sessionNames.remove(session.getId());
+            
+            // Only broadcast leave message if username was registered
+            if (username != null) {
+                // Create a leave message directly without using MessageUtils
+                String leaveMessage = username + " has left the chat";
+                ChatMessage chatLeaveMessage = ChatMessage.createLeaveMessage(username, leaveMessage);
                 
-                // Send updated user count to all clients
-                broadcastUserCount();
-            } catch (Exception e) {
-                logger.error("Error sending leave message: {}", e.getMessage(), e);
+                // Save the leave message to the database
+                chatMessageService.saveMessage(chatLeaveMessage);
+                
+                // Broadcast the leave message
+                broadcastMessage(chatLeaveMessage);
             }
+            
+            // Update user count
+            logger.info("Total active connections: {}", sessions.size());
+            broadcastUserCount();
+        } catch (Exception e) {
+            logger.error("Error handling connection closure: {}", e.getMessage(), e);
         }
     }
 
@@ -84,7 +96,7 @@ public class ChatMessageHandler extends TextWebSocketHandler {
      * Handles incoming text messages
      */
     @Override
-    protected void handleTextMessage(WebSocketSession session, TextMessage message) {
+    protected void handleTextMessage(@NonNull WebSocketSession session, @NonNull TextMessage message) {
         try {
             String payload = message.getPayload();
             logger.debug("Received message from session {}: {}", session.getId(), payload);
@@ -95,13 +107,25 @@ public class ChatMessageHandler extends TextWebSocketHandler {
             if (!sessionNames.containsKey(session.getId())) {
                 sessionNames.put(session.getId(), chatMessage.getName());
                 
-                // Send welcome message to the new user
-                String joinMessage = messageUtils.getMessage("chat.message.join", chatMessage.getName());
-                ChatMessage chatJoinMessage = ChatMessage.createJoinMessage(chatMessage.getName(), joinMessage);
-                broadcastMessage(chatJoinMessage);
+                // Only create a join message if the incoming message is not already a JOIN message
+                if (chatMessage.getType() != ChatMessage.MessageType.JOIN) {
+                    // Send welcome message to the new user
+                    String joinMessage = chatMessage.getName() + " has joined the chat";
+                    ChatMessage chatJoinMessage = ChatMessage.createJoinMessage(chatMessage.getName(), joinMessage);
+                    
+                    // Save the join message to the database
+                    chatMessageService.saveMessage(chatJoinMessage);
+                    
+                    broadcastMessage(chatJoinMessage);
+                } else {
+                    // If it's already a JOIN message, just save it and broadcast it
+                    chatMessageService.saveMessage(chatMessage);
+                    broadcastMessage(chatMessage);
+                }
                 
                 // Send updated user count to all clients
                 broadcastUserCount();
+                return; // Return early to avoid broadcasting the original message again
             }
             
             // Broadcast the original message
@@ -109,12 +133,18 @@ public class ChatMessageHandler extends TextWebSocketHandler {
                 chatMessage.setType(ChatMessage.MessageType.CHAT);
             }
             
+            // Only persist actual chat messages, not system messages like USER_COUNT
+            if (chatMessage.getType() == ChatMessage.MessageType.CHAT) {
+                // Save the chat message to the database
+                chatMessageService.saveMessage(chatMessage);
+            }
+            
             broadcastMessage(chatMessage);
             
         } catch (Exception e) {
             logger.error("Error handling message: {}", e.getMessage(), e);
             try {
-                String errorMessage = messageUtils.getMessage("chat.message.error.processing");
+                String errorMessage = "Error processing message";
                 ChatMessage errorChatMessage = ChatMessage.createErrorMessage(errorMessage);
                 String errorPayload = objectMapper.writeValueAsString(errorChatMessage);
                 session.sendMessage(new TextMessage(errorPayload));
@@ -147,7 +177,7 @@ public class ChatMessageHandler extends TextWebSocketHandler {
      * Handles WebSocket transport errors
      */
     @Override
-    public void handleTransportError(WebSocketSession session, Throwable exception) {
+    public void handleTransportError(@NonNull WebSocketSession session, @NonNull Throwable exception) {
         logger.error("Transport error for session {}: {}", session.getId(), exception.getMessage(), exception);
         try {
             if (session.isOpen()) {

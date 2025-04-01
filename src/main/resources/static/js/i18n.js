@@ -7,11 +7,15 @@ class I18n {
     this.currentLocale = 'en';
     this.missingKeys = new Set();
     this.developmentMode = this.isDevelopmentMode();
+    this.availableLocales = ['en', 'ca']; // Add more locales as they become available
   }
 
   async init() {
-    // Detect preferred browser language
-    const browserLang = navigator.language.split('-')[0];
+    // Try to load from localStorage first
+    const storedLocale = localStorage.getItem('preferred-language');
+    
+    // Detect preferred browser language if no stored preference
+    const browserLang = storedLocale || navigator.language.split('-')[0];
     await this.setLocale(browserLang);
 
     // Set up language selector if it exists
@@ -31,16 +35,22 @@ class I18n {
 
   async setLocale(locale) {
     try {
-      // Try to load messages for requested locale
-      const response = await fetch(`/api/messages?lang=${locale}`);
+      // Check if the requested locale is available, fallback to English if not
+      if (!this.availableLocales.includes(locale)) {
+        console.warn(`Locale ${locale} not available, falling back to English`);
+        locale = 'en';
+      }
+      
+      // Load messages directly from JSON file
+      const response = await fetch(`/i18n/messages_${locale}.json`);
       
       if (!response.ok) {
-        // Fallback to English if requested locale not available
+        // Fallback to English if requested locale file not found
         if (locale !== 'en') {
-          console.warn(`Locale ${locale} not available, falling back to English`);
+          console.warn(`Locale ${locale} file not found, falling back to English`);
           return this.setLocale('en');
         }
-        throw new Error('Failed to load translations');
+        throw new Error(`Failed to load translations for ${locale}`);
       }
       
       this.messages = await response.json();
@@ -59,6 +69,7 @@ class I18n {
       // Store preferred language
       localStorage.setItem('preferred-language', locale);
       
+      console.log(`Loaded ${Object.keys(this.messages).length} translations for locale: ${locale}`);
       return true;
     } catch (error) {
       console.error('Error setting locale:', error);
@@ -100,102 +111,100 @@ class I18n {
    * @returns {string} The translated string with the appropriate plural form
    */
   plural(key, count, options = {}) {
-    // Determine which plural form to use based on the language and count
-    const pluralForm = this.getPluralForm(count);
-    const pluralKey = `${key}.${pluralForm}`;
-    
-    // Check if specific plural form exists
-    if (this.messages[pluralKey]) {
-      // Include the count as the first argument by default
-      const args = options.args || [];
-      return this.t(pluralKey, count, ...args);
+    // Determine which plural form to use based on count
+    let form;
+    if (count === 0 && this.messages[`${key}.zero`]) {
+      form = 'zero';
+    } else if (count === 1) {
+      form = 'one';
+    } else {
+      form = 'other';
     }
     
-    // If no specific plural form found, try the general key
-    if (this.messages[key]) {
-      const args = options.args || [];
-      return this.t(key, count, ...args);
+    // Try to get the specific plural form
+    const pluralKey = `${key}.${form}`;
+    const message = this.messages[pluralKey];
+    
+    if (message === undefined) {
+      // Fallback to the base key if plural form not found
+      if (this.messages[key]) {
+        return this.t(key, count);
+      }
+      
+      // Log missing key
+      if (this.developmentMode) {
+        this.missingKeys.add(pluralKey);
+        console.warn(`Missing plural translation key: ${pluralKey}`);
+        return `⚠️ ${pluralKey} ⚠️`;
+      } else {
+        return key;
+      }
     }
     
-    // No translation found
-    if (this.developmentMode) {
-      this.missingKeys.add(pluralKey);
-      console.warn(`Missing plural translation key: ${pluralKey}`);
-      return `⚠️ ${pluralKey} (${count}) ⚠️`;
+    // Replace count placeholder and other parameters
+    let result = message.replace(/\{0\}/g, options.formatNumber ? this.formatNumber(count) : count);
+    
+    // Replace additional parameters if provided
+    if (options.params) {
+      Object.entries(options.params).forEach(([key, value]) => {
+        result = result.replace(new RegExp(`\{${key}\}`, 'g'), value);
+      });
     }
     
-    return key;
+    return result;
   }
   
   /**
-   * Get the plural form based on count and current locale
-   * Different languages have different plural rules
-   * @param {number} count The count value
-   * @returns {string} The plural form name ('zero', 'one', 'two', 'few', 'many', 'other')
-   */
-  getPluralForm(count) {
-    // Use Intl.PluralRules to determine the correct plural category
-    try {
-      const pluralRules = new Intl.PluralRules(this.currentLocale);
-      return pluralRules.select(count);
-    } catch (error) {
-      // Fallback for browsers that don't support Intl.PluralRules
-      return count === 1 ? 'one' : 'other';
-    }
-  }
-  
-  /**
-   * Check if application is running in development mode
-   */
-  isDevelopmentMode() {
-    // Simple check - if we're on localhost or a local IP
-    return window.location.hostname === 'localhost' || 
-           window.location.hostname === '127.0.0.1' ||
-           window.location.hostname.startsWith('192.168.') ||
-           window.location.hostname.startsWith('10.') ||
-           window.location.port !== '';
-  }
-
-  /**
-   * Format a date according to the current locale
+   * Format a date using the current locale
    */
   formatDate(date) {
+    if (!date) return '';
+    
+    // Convert string to Date object if needed
+    if (typeof date === 'string') {
+      date = new Date(date);
+    }
+    
     return this.dateFormatter.format(date);
   }
-
+  
   /**
-   * Update all elements with translation attributes
+   * Format a number using the current locale
+   */
+  formatNumber(number) {
+    return new Intl.NumberFormat(this.currentLocale).format(number);
+  }
+  
+  /**
+   * Update all elements with data-i18n attributes
    */
   updateDOM() {
-    // Update text content
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-      el.textContent = this.t(el.getAttribute('data-i18n'));
+    // Find all elements with data-i18n attribute
+    const elements = document.querySelectorAll('[data-i18n]');
+    
+    elements.forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      el.textContent = this.t(key);
     });
     
-    // Update placeholders
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-      el.placeholder = this.t(el.getAttribute('data-i18n-placeholder'));
+    // Find all elements with data-i18n-placeholder attribute
+    const placeholders = document.querySelectorAll('[data-i18n-placeholder]');
+    
+    placeholders.forEach(el => {
+      const key = el.getAttribute('data-i18n-placeholder');
+      el.placeholder = this.t(key);
     });
     
-    // Update buttons
-    document.querySelectorAll('[data-i18n-value]').forEach(el => {
-      el.value = this.t(el.getAttribute('data-i18n-value'));
-    });
-    
-    // Update titles/tooltips
-    document.querySelectorAll('[data-i18n-title]').forEach(el => {
-      el.title = this.t(el.getAttribute('data-i18n-title'));
-    });
-    
-    // Update aria-labels
-    document.querySelectorAll('[data-i18n-aria-label]').forEach(el => {
-      el.setAttribute('aria-label', this.t(el.getAttribute('data-i18n-aria-label')));
-    });
-    
-    // Emit event for dynamic components to update
-    document.dispatchEvent(new CustomEvent('i18n:updated', {
-      detail: { locale: this.currentLocale }
-    }));
+    // Dispatch event for components that need to update
+    document.dispatchEvent(new CustomEvent('i18n:updated'));
+  }
+  
+  /**
+   * Check if we're in development mode
+   */
+  isDevelopmentMode() {
+    return window.location.hostname === 'localhost' || 
+           window.location.hostname === '127.0.0.1';
   }
 }
 
@@ -205,99 +214,101 @@ window.i18n = i18n;
 
 // Initialize when DOM is loaded
 document.addEventListener('DOMContentLoaded', () => {
-  i18n.init().then(() => {
-    console.log(`Initialized i18n with locale: ${i18n.currentLocale}`);
-    
-    // In development mode, add a panel showing missing translation keys if any
-    if (i18n.developmentMode && i18n.missingKeys.size > 0) {
-      createMissingKeysPanel(i18n.missingKeys);
-    }
-  });
+  i18n.init();
 });
 
 /**
  * Create a panel showing missing translation keys
+ * Only shown in development mode
  */
 function createMissingKeysPanel(missingKeys) {
-  // Create panel container
-  const panel = document.createElement('div');
-  panel.style.position = 'fixed';
-  panel.style.bottom = '10px';
-  panel.style.right = '10px';
-  panel.style.width = '300px';
-  panel.style.maxHeight = '200px';
-  panel.style.overflowY = 'auto';
-  panel.style.background = '#ffebee';
-  panel.style.color = '#c62828';
-  panel.style.padding = '10px';
-  panel.style.borderRadius = '4px';
-  panel.style.boxShadow = '0 2px 5px rgba(0,0,0,0.2)';
-  panel.style.zIndex = '9999';
-  panel.style.fontSize = '12px';
+  if (!missingKeys || missingKeys.size === 0) return;
   
-  // Add header
-  const header = document.createElement('div');
-  header.style.fontWeight = 'bold';
-  header.style.marginBottom = '5px';
-  header.style.display = 'flex';
-  header.style.justifyContent = 'space-between';
-  header.textContent = `Missing Translation Keys (${missingKeys.size})`;
+  // Create panel if it doesn't exist
+  let panel = document.getElementById('missing-i18n-keys');
   
-  // Add close button
-  const closeBtn = document.createElement('span');
-  closeBtn.textContent = '×';
-  closeBtn.style.cursor = 'pointer';
-  closeBtn.style.fontSize = '16px';
-  closeBtn.style.lineHeight = '12px';
-  closeBtn.onclick = () => panel.remove();
-  header.appendChild(closeBtn);
+  if (!panel) {
+    panel = document.createElement('div');
+    panel.id = 'missing-i18n-keys';
+    panel.style.position = 'fixed';
+    panel.style.bottom = '10px';
+    panel.style.right = '10px';
+    panel.style.backgroundColor = 'rgba(255, 200, 200, 0.9)';
+    panel.style.padding = '10px';
+    panel.style.borderRadius = '5px';
+    panel.style.maxHeight = '300px';
+    panel.style.overflowY = 'auto';
+    panel.style.zIndex = '9999';
+    panel.style.fontSize = '12px';
+    panel.style.fontFamily = 'monospace';
+    panel.style.boxShadow = '0 0 10px rgba(0,0,0,0.2)';
+    
+    // Add close button
+    const closeBtn = document.createElement('button');
+    closeBtn.textContent = 'X';
+    closeBtn.style.float = 'right';
+    closeBtn.style.background = 'none';
+    closeBtn.style.border = 'none';
+    closeBtn.style.cursor = 'pointer';
+    closeBtn.style.fontSize = '16px';
+    closeBtn.onclick = () => panel.remove();
+    
+    panel.appendChild(closeBtn);
+    
+    // Add title
+    const title = document.createElement('h3');
+    title.textContent = 'Missing Translation Keys';
+    title.style.margin = '0 0 10px 0';
+    panel.appendChild(title);
+    
+    document.body.appendChild(panel);
+  }
   
-  panel.appendChild(header);
+  // Clear existing list
+  const existingList = panel.querySelector('ul');
+  if (existingList) {
+    existingList.remove();
+  }
   
-  // Add missing keys list
+  // Create list of missing keys
   const list = document.createElement('ul');
   list.style.margin = '0';
   list.style.padding = '0 0 0 20px';
   
-  Array.from(missingKeys).forEach(key => {
+  Array.from(missingKeys).sort().forEach(key => {
     const item = document.createElement('li');
     item.textContent = key;
     list.appendChild(item);
   });
   
   panel.appendChild(list);
-  
-  // Add panel to body
-  document.body.appendChild(panel);
 }
 
-/**
- * Helper functions for direct access
- */
+// Helper functions for direct access
 function t(key, ...args) {
-  return window.i18n.t(key, ...args);
+  return window.i18n ? window.i18n.t(key, ...args) : key;
 }
 
 function plural(key, count, options) {
-  return window.i18n.plural(key, count, options);
+  return window.i18n ? window.i18n.plural(key, count, options) : key;
 }
 
 function formatDate(date) {
-  return window.i18n.formatDate(date);
+  return window.i18n ? window.i18n.formatDate(date) : date;
 }
 
 function changeLanguage(locale) {
-  return window.i18n.setLocale(locale);
+  return window.i18n ? window.i18n.setLocale(locale) : false;
 }
 
 // Debug helper - available in console in development mode
 if (window.i18n && window.i18n.developmentMode) {
   window.showAllTranslationKeys = function() {
-    console.group('Available translation keys');
+    console.group('All translation keys:');
     Object.keys(window.i18n.messages).sort().forEach(key => {
-      console.log(`${key}: "${window.i18n.messages[key]}"`);
+      console.log(`${key} = ${window.i18n.messages[key]}`);
     });
     console.groupEnd();
-    return `Found ${Object.keys(window.i18n.messages).length} translation keys`;
+    return `${Object.keys(window.i18n.messages).length} keys available`;
   };
 }

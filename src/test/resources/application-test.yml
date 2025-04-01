@@ -1,22 +1,44 @@
-# Configuración específica para los tests
+# Test-specific configuration
 spring:
   autoconfigure:
     exclude: org.springframework.boot.autoconfigure.websocket.servlet.WebSocketServletAutoConfiguration
   
-  # Deshabilitar el arranque del servidor web embebido completo para los tests
+  # Disable full embedded web server startup for tests
   main:
     web-application-type: servlet
     allow-bean-definition-overriding: true
   
-  # Configuración de mensajes
+  # Message configuration
   messages:
     basename: messages/messages
     encoding: UTF-8
     fallback-to-system-locale: false
     use-code-as-default-message: true
 
-# Configuraciones de logging para tests
+  # Database configuration for tests
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    username: sa
+    password: 
+    driver-class-name: org.h2.Driver
+  
+  # JPA Configuration for tests
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+# Logging configuration for tests
 logging:
   level:
     org.springframework.web: INFO
     com.example.springbootwebsocket: DEBUG
+
+# WebSocket configuration for tests
+websocket:
+  endpoint: /ws/chat
+  allowed-origins: "*"
+  max-text-message-size: 8192
+  max-binary-message-size: 65536
+  max-session-idle-timeout: 600000

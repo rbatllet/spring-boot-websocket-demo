@@ -2,13 +2,35 @@ package com.example.springbootwebsocket;
 
 import java.time.Instant;
 
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.EnumType;
+import jakarta.persistence.Enumerated;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.Table;
+
 /**
  * Represents a chat message in the WebSocket communication
  */
+@Entity
+@Table(name = "chat_messages")
 public class ChatMessage {
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
+    
     private String name;
+    
     private String message;
+    
     private String timestamp;
+    
+    private int count;
+    
+    @Enumerated(EnumType.STRING)
+    @Column(name = "message_type")
     private MessageType type;
 
     /**
@@ -95,10 +117,20 @@ public class ChatMessage {
      * @return A new ChatMessage instance
      */
     public static ChatMessage createUserCountMessage(int count) {
-        return new ChatMessage("System", String.valueOf(count), MessageType.USER_COUNT);
+        ChatMessage message = new ChatMessage("System", "", MessageType.USER_COUNT);
+        message.count = count;
+        return message;
     }
 
     // Getters and setters
+    public Long getId() {
+        return id;
+    }
+
+    public void setId(Long id) {
+        this.id = id;
+    }
+    
     public String getName() {
         return name;
     }
@@ -129,5 +161,13 @@ public class ChatMessage {
 
     public void setType(MessageType type) {
         this.type = type;
+    }
+
+    public int getCount() {
+        return count;
+    }
+
+    public void setCount(int count) {
+        this.count = count;
     }
 }

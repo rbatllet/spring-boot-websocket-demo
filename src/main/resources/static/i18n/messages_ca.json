@@ -1,0 +1,31 @@
+{
+  "app.title": "Xat WebSocket amb Spring Boot",
+
+  "users.online.zero": "Cap usuari en línia",
+  "users.online.one": "{0} usuari en línia",
+  "users.online.other": "{0} usuaris en línia",
+
+  "chat.message.join": "{0} s'ha unit al xat",
+  "chat.message.leave": "{0} ha sortit del xat",
+  "chat.message.error.processing": "Error processant el missatge",
+  "chat.message.system": "Sistema",
+
+  "ui.language.selector": "Idioma:",
+  "ui.connection.disconnected": "Desconnectat",
+  "ui.connection.connected": "Connectat",
+  "ui.connection.connecting": "Connectant...",
+  "ui.error.name.required": "Si us plau, introdueix el teu nom",
+  "ui.error.message.required": "Si us plau, introdueix un missatge",
+  "ui.error.connection.failed": "Error de connexió: {0}",
+  "ui.error.websocket": "S'ha produït un error de WebSocket. Si us plau, torna-ho a provar més tard.",
+  "ui.error.send.failed": "Error en enviar el missatge: {0}",
+  "ui.error.not.connected": "No estàs connectat al xat",
+  "ui.error.display.message": "Error mostrant el missatge",
+  "ui.error.history.failed": "Error carregant l'historial de missatges",
+  "ui.message.history": "Historial de Missatges",
+  "ui.new.messages": "Missatges Nous",
+  "ui.button.connect": "Connectar",
+  "ui.button.send": "Enviar",
+  "ui.input.name.placeholder": "Introdueix el teu nom",
+  "ui.input.message.placeholder": "Escriu un missatge..."
+}

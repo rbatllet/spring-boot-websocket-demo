@@ -14,7 +14,40 @@ logging:
   pattern:
     console: "%d{yyyy-MM-dd HH:mm:ss} - %msg%n"
 
+# Spring configuration
+spring:
+  # H2 Database Configuration
+  datasource:
+    url: jdbc:h2:file:/app/data/chatdb
+    username: sa
+    password: password
+    driver-class-name: org.h2.Driver
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+      settings:
+        web-allow-others: false
+  # JPA Configuration
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: false
+  # Flyway Configuration
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+    validate-on-migrate: true
+
 # WebSocket configuration
-# In production, you should restrict allowed origins
-# websocket:
-#   allowed-origins: https://your-domain.com
+websocket:
+  endpoint: /ws/chat
+  allowed-origins: "*"
+  max-text-message-size: 8192
+  max-binary-message-size: 65536
+  max-session-idle-timeout: 600000

@@ -7,6 +7,8 @@ import org.springframework.web.socket.CloseStatus;
 import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
+import com.example.springbootwebsocket.service.ChatMessageService;
+
 import java.io.IOException;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -16,6 +18,7 @@ class ChatMessageHandlerTest {
 
     private ChatMessageHandler chatMessageHandler;
     private MessageUtils messageUtils;
+    private ChatMessageService chatMessageService;
     private WebSocketSession session1;
     private WebSocketSession session2;
     private TextMessage textMessage;
@@ -31,8 +34,13 @@ class ChatMessageHandlerTest {
         when(messageUtils.getMessage(eq("chat.message.error.processing")))
             .thenReturn("Error processing message");
         
+        // Mock ChatMessageService
+        chatMessageService = mock(ChatMessageService.class);
+        when(chatMessageService.saveMessage(any(ChatMessage.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+        
         // Create the handler with mocked dependencies
-        chatMessageHandler = new ChatMessageHandler(messageUtils);
+        chatMessageHandler = new ChatMessageHandler(messageUtils, chatMessageService);
         
         // Mock WebSocketSessions
         session1 = mock(WebSocketSession.class);
@@ -88,6 +96,10 @@ class ChatMessageHandlerTest {
         ArgumentCaptor<TextMessage> messageCaptor = ArgumentCaptor.forClass(TextMessage.class);
         verify(session2, atLeastOnce()).sendMessage(messageCaptor.capture());
         
+        // Verify that the leave message was saved to the database
+        verify(chatMessageService, atLeastOnce()).saveMessage(argThat(message -> 
+            message.getType() == ChatMessage.MessageType.LEAVE));
+        
         // Session2 receives both the original message and the leave message
         boolean foundLeaveMessage = false;
         for (TextMessage msg : messageCaptor.getAllValues()) {
@@ -107,8 +119,32 @@ class ChatMessageHandlerTest {
         chatMessageHandler.afterConnectionEstablished(session1);
         chatMessageHandler.afterConnectionEstablished(session2);
         
+        // First, register the username by sending a message
+        TextMessage registerMessage = new TextMessage("{\"name\":\"TestUser\",\"message\":\"Register\",\"type\":\"CHAT\"}");
+        chatMessageHandler.handleTextMessage(session1, registerMessage);
+        
+        // Reset the mocks to clear previous invocations
+        reset(chatMessageService);
+        reset(session1);
+        reset(session2);
+        
+        // Re-configure the mocks after reset
+        when(session1.getId()).thenReturn("session1");
+        when(session2.getId()).thenReturn("session2");
+        when(session1.isOpen()).thenReturn(true);
+        when(session2.isOpen()).thenReturn(true);
+        when(chatMessageService.saveMessage(any(ChatMessage.class)))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+        
+        // Now send an actual chat message after registration
+        TextMessage chatMessage = new TextMessage("{\"name\":\"TestUser\",\"message\":\"Hello World!\",\"type\":\"CHAT\"}");
+        
         // Test that message is broadcast to all sessions
-        chatMessageHandler.handleTextMessage(session1, textMessage);
+        chatMessageHandler.handleTextMessage(session1, chatMessage);
+        
+        // Verify that the chat message was saved to the database
+        verify(chatMessageService, atLeastOnce()).saveMessage(argThat(message -> 
+            message.getType() == ChatMessage.MessageType.CHAT));
         
         // Verify both sessions receive the message
         ArgumentCaptor<TextMessage> messageCaptor = ArgumentCaptor.forClass(TextMessage.class);
