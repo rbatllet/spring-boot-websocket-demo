@@ -139,7 +139,7 @@ mvn spring-boot:run
 
 ```bash
 ./mvnw clean package
-java -jar target/spring-boot-web-socket-1.2.0-SNAPSHOT.jar
+java -jar target/spring-boot-web-socket-1.3.0-SNAPSHOT.jar
 ```
 
 4. Open your browser and go to `http://localhost:8080`
