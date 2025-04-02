@@ -32,6 +32,18 @@ document.addEventListener("DOMContentLoaded", function() {
             sendToGroupChat();
         }
     });
+    
+    // Add input event listener to enable/disable send button based on content
+    messageInput.addEventListener("input", function() {
+        if (messageInput.disabled) return;
+        
+        // Enable button only if there's at least one non-whitespace character
+        if (messageInput.value.trim().length > 0) {
+            sendButton.disabled = false;
+        } else {
+            sendButton.disabled = true;
+        }
+    });
 
     // Enable pressing Enter to connect
     nameInput.addEventListener("keypress", function(event) {
@@ -40,28 +52,73 @@ document.addEventListener("DOMContentLoaded", function() {
             connect();
         }
     });
+    
+    // Add input event listener to enable/disable connect button based on name content
+    nameInput.addEventListener("input", function() {
+        // Enable button only if there's at least one non-whitespace character
+        if (nameInput.value.trim().length > 0) {
+            connectButton.disabled = false;
+        } else {
+            connectButton.disabled = true;
+        }
+    });
+    
+    // Initial check for name input to set connect button state
+    connectButton.disabled = nameInput.value.trim().length === 0;
+    
+    // Toggle formatting options visibility
+    const formattingToggle = document.getElementById("formattingToggle");
+    const formattingOptions = document.getElementById("formattingOptions");
+    if (formattingToggle && formattingOptions) {
+        formattingToggle.addEventListener("click", function() {
+            if (formattingOptions.style.display === "none") {
+                formattingOptions.style.display = "block";
+                formattingToggle.textContent = t("ui.formatting.hide");
+            } else {
+                formattingOptions.style.display = "none";
+                formattingToggle.textContent = t("ui.formatting.toggle");
+            }
+        });
+    }
 
-    // Listen for i18n updates to update connection status
+    // Listen for i18n updates to update connection status and button text
     document.addEventListener('i18n:updated', function() {
         if (connectionStatus) {
             updateConnectionStatus(connectionStatus.className.split(" ")[1]);
+        }
+        
+        // Update connect/disconnect button text based on connection state
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            connectButton.textContent = t("ui.button.disconnect");
+            connectButton.setAttribute("data-i18n", "ui.button.disconnect");
+        } else {
+            connectButton.textContent = t("ui.button.connect");
+            connectButton.setAttribute("data-i18n", "ui.button.connect");
+        }
+        
+        // Update online users count with current language
+        const onlineUsersElement = document.getElementById("onlineUsers");
+        if (onlineUsersElement && onlineUsersElement.dataset.count) {
+            const count = parseInt(onlineUsersElement.dataset.count, 10);
+            updateOnlineUsersText(count);
         }
     });
 });
 
 /**
- * Display an error message for a short time
+ * Log an error to the console without showing it in the UI
  */
 function showError(messageKey, ...args) {
-    if (!errorMessage) return;
+    // Only log to console, don't show in UI
+    console.error(t(messageKey, ...args));
     
-    errorMessage.textContent = t(messageKey, ...args);
-    errorMessage.style.display = "block";
-    
-    // Hide the error message after 5 seconds
-    setTimeout(function() {
-        errorMessage.style.display = "none";
-    }, 5000);
+    // The error message element is no longer used
+    // if (!errorMessage) return;
+    // errorMessage.textContent = t(messageKey, ...args);
+    // errorMessage.style.display = "block";
+    // setTimeout(function() {
+    //     errorMessage.style.display = "none";
+    // }, 5000);
 }
 
 /**
@@ -90,18 +147,40 @@ function updateConnectionStatus(status) {
  * Update online users counter with proper pluralization
  */
 function updateOnlineUsers(count) {
-    const onlineUsersElement = document.getElementById("online-users");
+    const onlineUsersElement = document.getElementById("onlineUsers");
     
     if (onlineUsersElement) {
-        // If we have a count of 0, hide the counter in some UIs
-        if (count === 0 && onlineUsersElement.classList.contains("hide-when-empty")) {
-            onlineUsersElement.style.display = "none";
-            return;
+        // Store the count as a data attribute for language changes
+        onlineUsersElement.dataset.count = count;
+        
+        // Update the text with the current language
+        updateOnlineUsersText(count);
+    }
+}
+
+/**
+ * Update online users text with current language
+ */
+function updateOnlineUsersText(count) {
+    const onlineUsersElement = document.getElementById("onlineUsers");
+    
+    if (onlineUsersElement) {
+        // Use the appropriate translation based on count
+        let key;
+        if (count === 0) {
+            key = "users.online.zero";
+        } else if (count === 1) {
+            key = "users.online.one";
         } else {
-            onlineUsersElement.style.display = "block";
+            key = "users.online.other";
         }
         
-        onlineUsersElement.textContent = plural("users.online", count);
+        // Get the translation and replace the placeholder
+        const translation = t(key, count);
+        onlineUsersElement.textContent = translation;
+        
+        // Log for debugging
+        console.log(`Updating users count: ${count}, using key: ${key}, result: ${translation}`);
     }
 }
 
@@ -160,9 +239,15 @@ function fetchMessageHistory() {
 }
 
 /**
- * Connect to the WebSocket server
+ * Connect or disconnect from the WebSocket server
  */
 function connect() {
+    // If already connected, disconnect
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        disconnect();
+        return;
+    }
+    
     // Validate username
     const name = nameInput.value.trim();
     if (!name) {
@@ -192,13 +277,17 @@ function connect() {
         console.log("Connected to WebSocket server");
         updateConnectionStatus("connected");
         
-        // Enable message input and send button
+        // Enable message input but keep send button disabled until text is entered
         messageInput.disabled = false;
-        sendButton.disabled = false;
+        sendButton.disabled = true;
         
-        // Disable name input and connect button
+        // Change connect button to disconnect
+        connectButton.textContent = t("ui.button.disconnect");
+        connectButton.setAttribute("data-i18n", "ui.button.disconnect");
+        connectButton.disabled = false;
+        
+        // Disable name input
         nameInput.disabled = true;
-        connectButton.disabled = true;
         
         // Show online users counter
         document.getElementById("onlineUsers").style.display = "block";
@@ -230,6 +319,15 @@ function connect() {
             if (data.type === "USER_COUNT") {
                 // Use the count field directly
                 updateOnlineUsers(data.count);
+            } else if (data.type === "ERROR") {
+                // Display error message in the UI
+                showError(data.message);
+                // Also add it to the chat as a system message
+                displayMessage(data);
+            } else if (data.type === "CHAT" && (!data.message || data.message.trim() === "")) {
+                // Skip empty chat messages
+                console.log("Skipping empty message");
+                return;
             } else {
                 // Display chat message
                 displayMessage(data);
@@ -244,19 +342,57 @@ function connect() {
         console.log("Disconnected from WebSocket server");
         updateConnectionStatus("disconnected");
         
-        // Disable message input and send button
-        messageInput.disabled = true;
-        sendButton.disabled = true;
-        
-        // Enable name input and connect button
-        nameInput.disabled = false;
-        connectButton.disabled = false;
+        // Reset UI to disconnected state
+        resetUIAfterDisconnect();
     };
     
     ws.onerror = function(error) {
         console.error("WebSocket error:", error);
         showError("ui.error.websocket");
     };
+}
+
+/**
+ * Disconnect from the WebSocket server
+ */
+function disconnect() {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+        // Send leave message before closing
+        try {
+            const leaveMessage = {
+                name: nameInput.value.trim(),
+                message: "",
+                type: "LEAVE"
+            };
+            ws.send(JSON.stringify(leaveMessage));
+        } catch (error) {
+            console.error("Error sending leave message:", error);
+        }
+        
+        // Close the connection
+        ws.close();
+    }
+    
+    // Reset UI to disconnected state
+    resetUIAfterDisconnect();
+}
+
+/**
+ * Reset UI elements after disconnection
+ */
+function resetUIAfterDisconnect() {
+    // Disable message input and send button
+    messageInput.disabled = true;
+    sendButton.disabled = true;
+    
+    // Enable name input and reset connect button
+    nameInput.disabled = false;
+    connectButton.textContent = t("ui.button.connect");
+    connectButton.setAttribute("data-i18n", "ui.button.connect");
+    connectButton.disabled = false;
+    
+    // Update connection status
+    updateConnectionStatus("disconnected");
 }
 
 /**
@@ -389,6 +525,9 @@ function sendToGroupChat() {
         ws.send(JSON.stringify(chatMessage));
         messageInput.value = ""; // Clear input field
         messageInput.focus();
+        
+        // Disable send button after sending (until new content is entered)
+        sendButton.disabled = true;
     } catch (error) {
         console.error("Error sending message:", error);
         showError("ui.error.send.failed", error.message);

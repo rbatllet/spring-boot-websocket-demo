@@ -8,6 +8,7 @@ import org.springframework.web.socket.TextMessage;
 import org.springframework.web.socket.WebSocketSession;
 
 import com.example.springbootwebsocket.service.ChatMessageService;
+import com.example.springbootwebsocket.security.MessageValidator;
 
 import java.io.IOException;
 
@@ -19,6 +20,7 @@ class ChatMessageHandlerTest {
     private ChatMessageHandler chatMessageHandler;
     private MessageUtils messageUtils;
     private ChatMessageService chatMessageService;
+    private MessageValidator messageValidator;
     private WebSocketSession session1;
     private WebSocketSession session2;
     private TextMessage textMessage;
@@ -39,8 +41,15 @@ class ChatMessageHandlerTest {
         when(chatMessageService.saveMessage(any(ChatMessage.class)))
             .thenAnswer(invocation -> invocation.getArgument(0));
         
+        // Mock MessageValidator
+        messageValidator = mock(MessageValidator.class);
+        when(messageValidator.validateAndSanitize(anyString()))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+        when(messageValidator.sanitize(anyString()))
+            .thenAnswer(invocation -> invocation.getArgument(0));
+        
         // Create the handler with mocked dependencies
-        chatMessageHandler = new ChatMessageHandler(messageUtils, chatMessageService);
+        chatMessageHandler = new ChatMessageHandler(messageUtils, chatMessageService, messageValidator);
         
         // Mock WebSocketSessions
         session1 = mock(WebSocketSession.class);

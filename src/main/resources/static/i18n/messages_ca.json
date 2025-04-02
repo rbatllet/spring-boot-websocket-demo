@@ -8,7 +8,10 @@
   "chat.message.join": "{0} s'ha unit al xat",
   "chat.message.leave": "{0} ha sortit del xat",
   "chat.message.error.processing": "Error processant el missatge",
+  "chat.message.error.xss": "El missatge conté contingut potencialment maliciós",
+  "chat.message.error.empty.after.sanitization": "El teu missatge quedaria buit després d'eliminar el contingut no segur",
   "chat.message.system": "Sistema",
+  "chat.formatting.help": "Pots utilitzar aquestes etiquetes HTML: <strong>negreta</strong>, <em>cursiva</em>, <u>subratllat</u>, <mark>ressaltat</mark>, <del>ratllat</del>",
 
   "ui.language.selector": "Idioma:",
   "ui.connection.disconnected": "Desconnectat",
@@ -25,7 +28,10 @@
   "ui.message.history": "Historial de Missatges",
   "ui.new.messages": "Missatges Nous",
   "ui.button.connect": "Connectar",
+  "ui.button.disconnect": "Desconnectar",
   "ui.button.send": "Enviar",
   "ui.input.name.placeholder": "Introdueix el teu nom",
-  "ui.input.message.placeholder": "Escriu un missatge..."
+  "ui.input.message.placeholder": "Escriu un missatge...",
+  "ui.formatting.toggle": "Mostrar opcions de format",
+  "ui.formatting.hide": "Amagar opcions de format"
 }

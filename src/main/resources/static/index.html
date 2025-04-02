@@ -38,6 +38,13 @@
             <input type="text" id="message" data-i18n-placeholder="ui.input.message.placeholder" placeholder="Type a message..." disabled>
             <button id="sendButton" onclick="sendToGroupChat()" disabled data-i18n="ui.button.send">Send</button>
         </div>
+        
+        <div class="formatting-help">
+            <button id="formattingToggle" class="formatting-toggle" data-i18n="ui.formatting.toggle">Show formatting options</button>
+            <div id="formattingOptions" class="formatting-options" style="display: none;">
+                <p data-i18n="chat.formatting.help">You can use these HTML tags: <strong>bold</strong>, <em>italic</em>, <u>underline</u>, <mark>highlight</mark>, <del>strikethrough</del></p>
+            </div>
+        </div>
     </div>
 
     <!-- Load JavaScript files -->

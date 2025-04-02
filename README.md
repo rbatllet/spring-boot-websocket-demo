@@ -25,6 +25,11 @@ This project is a simple demonstration of how to implement WebSockets in a Sprin
 - Prevention of duplicate join messages
 - Dynamic UI updates when changing language
 - In-memory database configuration for development
+- **Robust XSS protection and message validation**
+- **Connect/Disconnect functionality with dynamic button state**
+- **Dynamic button activation based on input validation**
+- **Message formatting options with HTML tags**
+- **Improved error handling and display**
 
 ## Prerequisites
 
@@ -46,6 +51,8 @@ This project is a simple demonstration of how to implement WebSockets in a Sprin
 - YAML for application configuration
 - JUnit 5 and Mockito for testing
 - Docker for deployment
+- **OWASP Java HTML Sanitizer for XSS protection**
+- **Apache Commons Text for HTML escaping**
 
 ## Project Structure
 
@@ -65,6 +72,8 @@ src
 │   │               │   └── HomeController.java (Home page controller)
 │   │               ├── repository
 │   │               │   └── ChatMessageRepository.java (JPA repository for messages)
+│   │               ├── security
+│   │               │   └── MessageValidator.java (XSS protection and message validation)
 │   │               ├── service
 │   │               │   └── ChatMessageService.java (Service for message operations)
 │   │               ├── SpringBootWebSocketApplication.java (Main class)
@@ -138,12 +147,14 @@ java -jar target/spring-boot-web-socket-1.2.0-SNAPSHOT.jar
 ## How to Use the Application
 
 1. Enter your name in the text field
-2. Click "Connect" to join the chat
+2. Click "Connect" to join the chat (button will be disabled until a valid name is entered)
 3. The application will load and display message history
 4. Type a message in the bottom text field
-5. Click "send" to send the message
+5. Click "send" to send the message (button will be disabled until a message is entered)
 6. All connected users will see your message immediately
-7. Change language using the language selector (English and Catalan available)
+7. Click "Disconnect" to leave the chat
+8. Change language using the language selector (English and Catalan available)
+9. Click "Show formatting options" to see available HTML formatting tags
 
 ## Database Access
 
@@ -254,6 +265,35 @@ The application uses a custom JavaScript internationalization implementation wit
 - Support for message formatting with placeholders
 - Support for plural forms
 - Date and time formatting according to the selected locale
+- Dynamic UI updates when changing language
+
+## Enhanced User Experience Features
+
+The application includes several features to enhance the user experience:
+
+### Dynamic Button States
+
+- The "Connect" button is disabled until a valid name is entered
+- The "Connect" button changes to "Disconnect" when connected
+- The "Send" button is disabled until a message is entered
+
+### Message Formatting
+
+- Users can display formatting options by clicking the "Show formatting options" button
+- Supported HTML tags include bold, italic, underline, highlight, and strikethrough
+- The formatting options panel can be hidden by clicking the "Hide formatting options" button
+
+### Error Handling
+
+- Errors are displayed directly in the chat for better visibility
+- Connection errors are clearly indicated with appropriate messages
+- XSS protection prevents malicious content from being displayed
+
+### User Count Display
+
+- The number of online users is displayed with proper pluralization
+- The count updates dynamically when users join or leave
+- The display updates correctly when changing languages
 
 ## Microservices Architecture Considerations
 
@@ -282,12 +322,21 @@ When migrating to microservices, consider the following potential services:
 - Notification Service
 - Internationalization Service
 
+## XSS Protection
+
+The application includes robust XSS protection features to prevent malicious scripts from being executed. These features include:
+
+- **Input Validation**: All user input is validated and sanitized to prevent malicious scripts from being injected.
+- **Output Encoding**: All output is encoded to prevent malicious scripts from being executed.
+- **Content Security Policy (CSP)**: A CSP is implemented to define which sources of content are allowed to be executed within a web page.
+- **OWASP Java HTML Sanitizer**: The OWASP Java HTML Sanitizer is used to sanitize user input and prevent malicious scripts from being injected.
+
 ## Development Components
 
 ### Frontend Components
 
 - `i18n.js`: Client-side internationalization using modern JavaScript APIs
-- `chat.js`: Frontend logic for WebSocket communication
+- `chat.js`: Frontend logic for WebSocket communication and UI interactions
 - `index.html`: User interface with internationalization attributes
 
 ### Backend Components
@@ -296,12 +345,14 @@ When migrating to microservices, consider the following potential services:
 - `ChatMessageService`: Business logic for chat messages
 - `ChatMessageRepository`: Data access for chat messages
 - `WebSocketConfig`: WebSocket configuration
+- `MessageValidator`: XSS protection and message validation
 
 ### Test Components
 
 - Unit tests for backend components
 - Integration tests for API endpoints
 - Configuration tests for WebSocket setup
+- HTML structure and attribute tests
 
 ## Adding Features
 
@@ -316,7 +367,6 @@ Here are some ideas for extending the application:
 - User typing indicators
 - Message search functionality
 - User profiles with avatars
-- Message formatting (markdown, rich text)
 - Push notifications for offline users
 
 ## Docker Support

@@ -12,7 +12,7 @@ import org.springframework.web.socket.handler.TextWebSocketHandler;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.example.springbootwebsocket.service.ChatMessageService;
-import com.example.springbootwebsocket.MessageUtils;
+import com.example.springbootwebsocket.security.MessageValidator;
 
 import java.io.IOException;
 import java.util.Map;
@@ -29,11 +29,14 @@ public class ChatMessageHandler extends TextWebSocketHandler {
     private final Map<String, String> sessionNames = new ConcurrentHashMap<>();
     private final ObjectMapper objectMapper = new ObjectMapper();
     private final ChatMessageService chatMessageService;
+    private final MessageValidator messageValidator;
+    private final MessageUtils messageUtils;
 
     @Autowired
-    public ChatMessageHandler(MessageUtils messageUtils, ChatMessageService chatMessageService) {
+    public ChatMessageHandler(MessageUtils messageUtils, ChatMessageService chatMessageService, MessageValidator messageValidator) {
         this.chatMessageService = chatMessageService;
-        // messageUtils is not used but kept for backward compatibility
+        this.messageValidator = messageValidator;
+        this.messageUtils = messageUtils;
     }
 
     /**
@@ -102,6 +105,46 @@ public class ChatMessageHandler extends TextWebSocketHandler {
             logger.debug("Received message from session {}: {}", session.getId(), payload);
             
             ChatMessage chatMessage = objectMapper.readValue(payload, ChatMessage.class);
+            
+            // Validate and sanitize the message content to prevent XSS attacks
+            if (chatMessage.getMessage() != null) {
+                // Check for empty messages - silently ignore them
+                if (chatMessage.getType() == ChatMessage.MessageType.CHAT && 
+                    chatMessage.getMessage().trim().isEmpty()) {
+                    // Just return without sending any error message
+                    return;
+                }
+                
+                String sanitizedMessage = messageValidator.validateAndSanitize(chatMessage.getMessage());
+                if (sanitizedMessage == null) {
+                    // Message failed validation, send error message back to sender
+                    String errorMessage = messageUtils.getMessage("chat.message.error.xss");
+                    ChatMessage errorChatMessage = ChatMessage.createErrorMessage(errorMessage);
+                    String errorPayload = objectMapper.writeValueAsString(errorChatMessage);
+                    session.sendMessage(new TextMessage(errorPayload));
+                    return;
+                }
+                
+                // Check if the message would be empty after sanitization
+                if (chatMessage.getType() == ChatMessage.MessageType.CHAT && 
+                    sanitizedMessage.trim().isEmpty()) {
+                    // Message would be empty after sanitization
+                    String errorMessage = messageUtils.getMessage("chat.message.error.empty.after.sanitization");
+                    ChatMessage errorChatMessage = ChatMessage.createErrorMessage(errorMessage);
+                    String errorPayload = objectMapper.writeValueAsString(errorChatMessage);
+                    session.sendMessage(new TextMessage(errorPayload));
+                    return;
+                }
+                
+                // Set the sanitized message
+                chatMessage.setMessage(sanitizedMessage);
+            }
+            
+            // Sanitize the username as well
+            if (chatMessage.getName() != null) {
+                String sanitizedName = messageValidator.sanitize(chatMessage.getName());
+                chatMessage.setName(sanitizedName);
+            }
             
             // Register username if not registered
             if (!sessionNames.containsKey(session.getId())) {
